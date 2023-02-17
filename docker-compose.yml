@@ -1,0 +1,215 @@
+version: "3.7"
+
+networks:
+  frontend:
+  backend:
+
+services:
+  # -----------------------------------------------------------------
+  # Reverse Proxy
+
+  traefik:
+    image: traefik:v2.6
+    container_name: "traefik"
+    restart: unless-stopped
+
+    networks:
+      - frontend
+      - backend
+
+    ports:
+      - 80:80
+      - 443:443
+
+    volumes:
+      # Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # Define Time
+      - /etc/localtime:/etc/localtime:ro
+
+        # Configuration
+      - ./devops/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
+      - ./devops/traefik/traefik_dynamic.toml:/etc/traefik/traefik_dynamic.toml:ro
+
+      # Data Storage
+      - ./data/traefik/acme.json:/acme.json
+
+  # -----------------------------------------------------------------
+  # Mosquitto
+  # mqtt.bee.espertamente.com.br
+
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    restart: always
+    container_name: "mosquitto"
+
+    networks:
+      - backend
+
+    ports:
+      - 1883:1883
+
+    volumes:
+      # Configuration
+      - ./devops/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./devops/mosquitto/mosquitto.passwd:/mosquitto/config/mosquitto.passwd:ro
+
+      # Data Storage
+      - ./data/mosquitto/data:/mosquitto/data
+
+      # Log Storage
+      - ./data/mosquitto/log:/mosquitto/log
+
+  # -----------------------------------------------------------------
+  # InfluxDB
+  # influxdb.bee.espertamente.com.br
+
+  influxdb:
+    image: influxdb:latest
+    container_name: "influxdb"
+    restart: always
+
+    networks:
+      - frontend
+      - backend
+
+    ports:
+      - 8086:8086
+
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=espertamente
+      - DOCKER_INFLUXDB_INIT_PASSWORD=Iy03yxMzFrahYBv2TBIn
+      - DOCKER_INFLUXDB_INIT_ORG=espertamente
+      - DOCKER_INFLUXDB_INIT_BUCKET=bee
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=WCHiXnonzowflQRsO7QM
+
+    volumes:
+      # Configuration
+      # - ./devops/influxdb:/etc/influxdb2
+      # Data Storage
+      - ./data/influxdb:/var/lib/influxdb2
+
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.influxdb.rule=Host(`influxdb.bee.espertamente.com.br`)"
+      - "traefik.http.routers.influxdb.entrypoints=websecure"
+
+      - "traefik.http.services.influxdb.loadbalancer.server.port=8086"
+
+      - "traefik.http.routers.influxdb.service=influxdb"
+      - "traefik.http.routers.influxdb.tls.certresolver=letsencrypt"
+
+  # -----------------------------------------------------------------
+  # Telegraf
+
+  telegraf:
+    image: telegraf:latest
+    container_name: "telegraf"
+    restart: always
+
+    networks:
+      - backend
+
+    ports:
+      - 8125:8125
+
+    volumes:
+      # Configuration
+      - ./devops/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    depends_on:
+      - influxdb
+    links:
+      - influxdb
+
+    environment:
+      - DOCKER_INFLUXDB_INIT_ORG=espertamente
+      - DOCKER_INFLUXDB_INIT_BUCKET=bee
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=WCHiXnonzowflQRsO7QM
+
+    labels:
+      - "traefik.enable=false"
+
+  # -----------------------------------------------------------------
+  # NodeRED
+  # nodered.bee.espertamente.com.br
+
+  nodered:
+    image: nodered/node-red:latest
+    restart: unless-stopped
+    container_name: nodered
+
+    networks:
+      - frontend
+      - backend
+
+    user: root:root
+
+    environment:
+      - TZ=America/Sao_Paulo
+      # - NODE_RED_ENABLE_PROJECTS=true
+      # - NODE_RED_CREDENTIAL_SECRET=$apr1$GCd5TkKn$PZvSTWH7UkvkszmYSaNUI/
+
+    volumes:
+      # Define Time
+      - /etc/localtime:/etc/localtime:ro
+
+      # Configuration
+      - ./devops/nodered/settings.js:/data/settings.js
+      - ./devops/nodered/public_html:/data/public_html
+
+      # data Storage
+      - ./data/nodered:/data
+
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.nodered.rule=Host(`nodered.bee.espertamente.com.br`)"
+      - "traefik.http.routers.nodered.entrypoints=websecure"
+
+      - "traefik.http.services.nodered.loadbalancer.server.port=1880"
+
+      - "traefik.http.routers.nodered.service=nodered"
+      - "traefik.http.routers.nodered.tls.certresolver=letsencrypt"
+
+  # -----------------------------------------------------------------
+  # Node
+
+  # node_custom:
+  #   image: node_custom:1.0.0
+  #   container_name: node_custom
+  #   build:
+  #     context: .
+  #     dockerfile: ./devops/node_custom/Dockerfile
+  #   restart: always
+
+  #   user: root
+  #   working_dir: /home/node/app
+
+  #   networks:
+  #     - frontend
+  #     - backend
+
+  #   volumes:
+  #     - ./software/userinterface:/home/node/app
+
+  #   #ports:
+  #   #  - "8080:8080"
+
+  #   # this is related to the line 7 of package.json
+  #   command: "npm start"
+
+  #   labels:
+  #     - "traefik.enable=true"
+
+  #     - "traefik.http.routers.node_custom.rule=Host(`bee.espertamente.com.br`)"
+  #     - "traefik.http.routers.node_custom.entrypoints=websecure"
+
+  #     - "traefik.http.services.node_custom.loadbalancer.server.port=8080"
+
+  #     - "traefik.http.routers.node_custom.service=node_custom"
+  #     - "traefik.http.routers.node_custom.tls.certresolver=letsencrypt"
