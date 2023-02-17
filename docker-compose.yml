@@ -106,7 +106,7 @@ services:
   # Telegraf
 
   telegraf:
-    image: telegraf:latest
+    image: telegraf:1.24
     container_name: "telegraf"
     restart: always
 
