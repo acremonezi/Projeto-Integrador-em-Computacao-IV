@@ -1,0 +1,15 @@
+Como podemos ver com “geteCO2 ()”, ele retorna a medição estimada de dióxido 
+de carbono armazenado, medida em partes por milhão (ppm).
+
+Como uma preocupação atual, uma vez que os coronavírus se espalham pelo ar,
+ níveis mais altos de CO2 em uma sala provavelmente significam que há uma 
+ chance maior de transmissão se uma pessoa infectada estiver dentro de casa. 
+ Segundo estudo de pesquisadores de Taiwan , é recomendável tentar manter
+ os níveis de CO2 abaixo de 600 ppm.
+
+Com "getTVOC ()" ele retorna a medida do total de compostos orgânicos voláteis
+ armazenados em partes por bilhão (ppb). Os níveis apropriados devem ser 
+ inferiores a 250ppb, conforme mostrado na imagem a seguir.
+
+Para obter mais informações sobre a biblioteca e referências de classe, você pode entrar aqui.
+https://adafruit.github.io/Adafruit_CCS811/html/class_adafruit___c_c_s811.html
